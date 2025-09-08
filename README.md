@@ -86,7 +86,7 @@ This workflow ensures reliable, zero-downtime Blue/Green deployments while maint
 ### 1. Clone and navigate to stacks directory (all commands run from here)
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/aws-samples/sample-blue-green-deployment-with-api-gateway.git
 cd blue-green-deployment-apigw-lambda/stacks
 ```
 
