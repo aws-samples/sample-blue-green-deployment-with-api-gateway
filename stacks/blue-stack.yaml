@@ -1,0 +1,144 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Blue environment stack for Blue-Green deployment pattern.
+  Contains Blue API Gateway and Lambda function.
+
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+    Runtime: python3.13
+    Environment:
+      Variables:
+        API_VERSION: v1
+        LOG_LEVEL: INFO
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+      AllowOrigin: "'*'"
+
+Resources:
+  # IAM Role for Lambda Execution
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CloudWatchLogsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                Resource: 
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-*"
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-*:*"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-blue-lambda-execution-role"
+        - Key: Environment
+          Value: "blue"
+
+  # Blue Environment API Gateway
+  BlueApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub "${AWS::StackName}-blue-api"
+      StageName: v1
+      EndpointConfiguration:
+        Type: REGIONAL
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+        AllowOrigin: "'*'"
+        MaxAge: "'600'"
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          LoggingLevel: INFO
+          DataTraceEnabled: true
+          MetricsEnabled: true
+          ThrottlingRateLimit: 100
+          ThrottlingBurstLimit: 200
+
+  # Blue Lambda Function
+  BlueLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-blue-lambda"
+      CodeUri: ../src/blue/
+      Handler: app.lambda_handler
+      Runtime: python3.13
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          ENVIRONMENT: blue
+          API_VERSION: v1
+      Events:
+        BlueApiOrders:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BlueApi
+            Path: /orders
+            Method: post
+        BlueApiPets:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BlueApi
+            Path: /pets
+            Method: get
+        BlueApiHealth:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BlueApi
+            Path: /health
+            Method: get
+      Tags:
+        Name: !Sub "${AWS::StackName}-blue-lambda"
+        Environment: "blue"
+
+  # Lambda Permission for API Gateway
+  BlueLambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BlueLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${BlueApi}/*/*"
+
+Outputs:
+  BlueApiEndpoint:
+    Description: Blue environment API Gateway endpoint URL
+    Value: !Sub "https://${BlueApi}.execute-api.${AWS::Region}.amazonaws.com/v1"
+
+
+  BlueApiId:
+    Description: Blue environment API Gateway ID
+    Value: !Ref BlueApi
+
+
+  BlueApiStage:
+    Description: Blue environment API Gateway stage
+    Value: v1
+
+  BlueLambdaArn:
+    Description: Blue Lambda function ARN
+    Value: !GetAtt BlueLambdaFunction.Arn

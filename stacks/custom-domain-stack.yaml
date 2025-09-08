@@ -1,0 +1,110 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Custom domain stack for Blue-Green deployment pattern.
+  Contains API Gateway custom domain and Route53 DNS configuration.
+
+Parameters:
+
+  PublicHostedZoneId:
+    Type: String
+    Description: Route53 public hosted zone ID for the domain (e.g., Z1D633PJN98FT9)
+    AllowedPattern: '^Z[A-Z0-9]+'
+    ConstraintDescription: Must be a valid Route53 hosted zone ID
+
+  CustomDomainName:
+    Type: String
+    Description: Route53 domain name for the API custom domain (e.g., api.example.com)
+    MinLength: 1
+    MaxLength: 253
+    AllowedPattern: '^[a-zA-Z0-9][a-zA-Z0-9-\.]*[a-zA-Z0-9]$'
+    ConstraintDescription: Must be a valid domain name format
+
+  CertificateArn:
+    Type: String
+    Description: ARN of the ACM certificate for HTTPS termination (must be in the same region)
+    AllowedPattern: '^arn:aws:acm:[a-z0-9-]+:[0-9]{12}:certificate/[a-f0-9-]+$'
+    ConstraintDescription: Must be a valid ACM certificate ARN
+
+  ActiveApiId:
+    Type: String
+    Description: API Gateway ID of the active environment (Blue or Green)
+    MinLength: 1
+
+  ActiveApiStage:
+    Type: String
+    Description: API Gateway stage of the active environment
+    Default: v1
+    AllowedValues: [v1, v2]
+
+Resources:
+  # Custom Domain Name Configuration
+  ApiCustomDomain:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName: !Ref CustomDomainName
+      RegionalCertificateArn: !Ref CertificateArn
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      SecurityPolicy: TLS_1_2
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-custom-domain"
+        - Key: Environment
+          Value: !Sub "${AWS::StackName}"
+        - Key: Purpose
+          Value: "Blue-Green-API-Deployment"
+
+  # Route53 DNS Record for Custom Domain
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn: ApiCustomDomain
+    Properties:
+      HostedZoneId: !Ref PublicHostedZoneId
+      Name: !Ref CustomDomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApiCustomDomain.RegionalDomainName
+        HostedZoneId: !GetAtt ApiCustomDomain.RegionalHostedZoneId
+        EvaluateTargetHealth: false
+
+  # Root API Mapping for Active Environment
+  RootMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    DependsOn: ApiCustomDomain
+    Properties:
+      DomainName: !Ref ApiCustomDomain
+      RestApiId: !Ref ActiveApiId
+      Stage: !Ref ActiveApiStage
+
+Outputs:
+  CustomDomainName:
+    Description: Custom domain name for the API
+    Value: !Ref CustomDomainName
+
+  CustomDomainUrl:
+    Description: Custom domain URL for API access
+    Value: !Sub "https://${CustomDomainName}"
+
+
+  ApiCustomDomainName:
+    Description: API Gateway custom domain name resource
+    Value: !Ref ApiCustomDomain
+
+
+  RegionalDomainName:
+    Description: Regional domain name for the custom domain
+    Value: !GetAtt ApiCustomDomain.RegionalDomainName
+
+
+  ActiveApiId:
+    Description: Currently active API Gateway ID
+    Value: !Ref ActiveApiId
+
+
+  ActiveApiStage:
+    Description: Currently active API Gateway stage
+    Value: !Ref ActiveApiStage

@@ -1,0 +1,143 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Green environment stack for Blue-Green deployment pattern.
+  Contains Green API Gateway and Lambda function.
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+    Runtime: python3.13
+    Environment:
+      Variables:
+        API_VERSION: v2
+        LOG_LEVEL: INFO
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+      AllowOrigin: "'*'"
+
+Resources:
+  # IAM Role for Lambda Execution
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CloudWatchLogsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                Resource: 
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-*"
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-*:*"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-green-lambda-execution-role"
+        - Key: Environment
+          Value: "green"
+
+  # Green Environment API Gateway
+  GreenApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub "${AWS::StackName}-green-api"
+      StageName: v2
+      EndpointConfiguration:
+        Type: REGIONAL
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+        AllowOrigin: "'*'"
+        MaxAge: "'600'"
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          LoggingLevel: INFO
+          DataTraceEnabled: true
+          MetricsEnabled: true
+          ThrottlingRateLimit: 100
+          ThrottlingBurstLimit: 200
+
+  # Green Lambda Function
+  GreenLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-green-lambda"
+      CodeUri: ../src/green/
+      Handler: app.lambda_handler
+      Runtime: python3.13
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          ENVIRONMENT: green
+          API_VERSION: v2
+      Events:
+        GreenApiOrders:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GreenApi
+            Path: /orders
+            Method: post
+        GreenApiPets:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GreenApi
+            Path: /pets
+            Method: get
+        GreenApiHealth:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GreenApi
+            Path: /health
+            Method: get
+      Tags:
+        Name: !Sub "${AWS::StackName}-green-lambda"
+        Environment: "green"
+
+  # Lambda Permission for API Gateway
+  GreenLambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GreenLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${GreenApi}/*/*"
+
+Outputs:
+  GreenApiEndpoint:
+    Description: Green environment API Gateway endpoint URL
+    Value: !Sub "https://${GreenApi}.execute-api.${AWS::Region}.amazonaws.com/v2"
+
+  GreenApiId:
+    Description: Green environment API Gateway ID
+    Value: !Ref GreenApi
+
+
+  GreenApiStage:
+    Description: Green environment API Gateway stage
+    Value: v2
+
+
+  GreenLambdaArn:
+    Description: Green Lambda function ARN
+    Value: !GetAtt GreenLambdaFunction.Arn
