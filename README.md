@@ -124,7 +124,7 @@ curl --request GET \
   --url https://<ApiEndpoint>/health
 ```
 
-#### Health check API Response:
+Expected Response:
 ```bash
 {
   "status": "healthy", 
@@ -141,7 +141,7 @@ curl --request GET \
   --url https://<ApiEndpoint>/pets
 ```
 
-#### Get pets API response:
+Expected response:
 ```bash
 {
   "environment": "blue",
@@ -181,7 +181,7 @@ curl --request POST \
 }'
 ```
 
-#### Create order API response:
+Expected response:
 ```bash
 {
   "confirmationNumber": "ORD-3251C0F4", 
