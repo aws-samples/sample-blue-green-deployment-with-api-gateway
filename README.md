@@ -1,6 +1,6 @@
-# Building Blue Green deployment using Amazon API Gateway
+# Zero downtime blue/green deployments with Amazon API Gateway
 
-This sample application demonstrates a Blue-Green deployment pattern for serverless applications using Amazon API Gateway custom domain names and API mapping. The solution showcases zero-downtime deployments for regional REST APIs implemented with API Gateway and AWS Lambda, deployed using SAM (Serverless Application Model) templates.
+This sample application demonstrates a blue/green deployment pattern for serverless applications using Amazon API Gateway custom domain names and API mapping. The solution showcases zero-downtime deployments for regional REST APIs implemented with API Gateway and AWS Lambda, deployed using SAM (Serverless Application Model) templates.
 
 ## Table of Contents
 
@@ -13,7 +13,7 @@ This sample application demonstrates a Blue-Green deployment pattern for serverl
 
 ## Overview
 
-This project implements a complete Blue-Green deployment solution using:
+This project implements a complete blue/green deployment solution using:
 
 - **AWS Lambda** with Python 3.13 runtime for serverless compute
 - **Amazon API Gateway** with custom domain names for API management
@@ -25,25 +25,25 @@ The system uses a pet store API example. Note that this is a sample project to u
 
 ## Architecture
 
-You’ll implement the following Blue/Green deployment architecture using Amazon API Gateway custom domain API mapping.
+You’ll implement the following blue/green deployment architecture using Amazon API Gateway custom domain API mapping.
 
 ![Blue-Green Deployment Architecture](architecture/Blue-Green-Deployment-Architecture.png)
 
-The Blue/Green deployment architecture consists of four primary components. When you access the API endpoint, Amazon Route53 resolves the domain to the API Gateway custom domain. API Gateway custom domain handles HTTPS termination using the configured ACM certificate and then routes the incoming request to the active environment.
+The blue/green deployment architecture consists of four primary components. When you access the API endpoint, Amazon Route53 resolves the domain to the API Gateway custom domain. API Gateway custom domain handles HTTPS termination using the configured ACM certificate and then routes the incoming request to the active environment.
 
-- You’ll first setup the `Blue` environment along with Route 53 DNS configuration and test it. 
-- After that you'll deploy a new version of the application on `Green` environment and test it using direct API Gateway URL while the live traffic is still being served from Blue environment. 
-- Then you’ll switch the traffic from `Blue` to `Green` using API Gateway custom domain API mapping without changing the external (client facing) API URL. At this point, the live traffic will be served by Green environment. 
-- If any issue observed during this time, you can quickly rollback to the `Blue` environment and fix the `Green` environment. 
-- Or, if the `Green` environment is stable, you’ll decommission that `Blue` environment after some time.
+- You’ll first setup the `blue` environment along with Route 53 DNS configuration and test it. 
+- After that you'll deploy a new version of the application on `green` environment and test it using direct API Gateway URL while the live traffic is still being served from blue environment. 
+- Then you’ll switch the traffic from `blue` to `green` using API Gateway custom domain API mapping without changing the external (client facing) API URL. At this point, the live traffic will be served by green environment. 
+- If any issue observed during this time, you can quickly rollback to the `blue` environment and fix the `green` environment. 
+- Or, if the `green` environment is stable, you’ll decommission that `blue` environment after some time.
 
 **Key Benefits Illustrated:**
 - **Zero Downtime**: Traffic switching happens at the API Gateway level
 - **Quick Rollback**: Fallback to the previous stable version if issues occur
-- **Environment Isolation**: Blue and Green environments are completely separate, preventing interference
+- **Environment Isolation**: blue and green environments are completely separate, preventing interference
 - **Safe Testing**: New versions are thoroughly tested before receiving production traffic
 
-This workflow ensures reliable, zero-downtime Blue/Green deployments while maintaining the ability to quickly recover from any issues that may arise in production during new version deployment.
+This workflow ensures reliable, zero-downtime blue/green deployments while maintaining the ability to quickly recover from any issues that may arise in production during new version deployment.
 
 ## Prerequisites
 
@@ -90,8 +90,8 @@ git clone https://github.com/aws-samples/sample-blue-green-deployment-with-api-g
 cd blue-green-deployment-apigw-lambda/stacks
 ```
 
-### 2. Deploy Blue Environment
-Run the following command to deploy the `Blue` environment.
+### 2. Deploy blue Environment
+Run the following command to deploy the `blue` environment.
 
 ```bash
 sam build -t blue-stack.yaml
@@ -114,8 +114,8 @@ sam build -t blue-stack.yaml
 sam deploy -t blue-stack.yaml --config-file blue-samconfig.toml
 ```
 
-### 3. Test the Blue Environment
-Run the following commands to test the Blue environment. Replace `ApiEndpoint` with `BlueApiEndpoint`.
+### 3. Test the blue Environment
+Run the following commands to test the blue environment. Replace `ApiEndpoint` with `BlueApiEndpoint`.
 
 
 #### Health check API request:
@@ -200,8 +200,8 @@ Expected response:
 Validate that the response contains the `environment` attribute set to `blue` and `version` attribute set to `v1.0.0`.
 
 
-### 4. Deploy Custom Domain pointing to Blue environment
-Run the following command to deploy to the Amazon API Gateway custom domain name and API mapping pointing to Blue environment.
+### 4. Deploy Custom Domain pointing to blue environment
+Run the following command to deploy to the Amazon API Gateway custom domain name and API mapping pointing to blue environment.
 ```bash
 sam build -t custom-domain-stack.yaml
 sam deploy -g -t custom-domain-stack.yaml
@@ -227,9 +227,9 @@ Follow the test method mentioned in step #3 to test the Production (live). Repla
 
 Validate the Production (live) environment response contain the `environment` attribute set to `blue` and `version` attribute set to `v1.0.0`
 
-### 6. Deploy Green Environment
+### 6. Deploy green Environment
 
-Run the following command to deploy the `Green` environment.
+Run the following command to deploy the `green` environment.
 
 ```bash
 sam build -t green-stack.yaml
@@ -238,7 +238,7 @@ sam deploy -g -t green-stack.yaml
 
 Enter the following details:
 - **Stack Name**: <YourStackName> (e.g. blue-green-api-green)
-- **AWS Region**: Select the same region as Blue environment (e.g. us-east-1)
+- **AWS Region**: Select the same region as blue environment (e.g. us-east-1)
 - **GreenLambdaFunction has no authentication. Is this okay?**: `y`
 - **SAM configuration file**: `green-samconfig.toml`
 
@@ -252,16 +252,16 @@ sam build -t green-stack.yaml
 sam deploy -t green-stack.yaml --config-file green-samconfig.toml
 ```
 
-### 7. Test the Green Environment
+### 7. Test the green Environment
 
 Follow the test method mentioned in step #3 to test the Production (live). Replace `ApiEndpoint` with `GreenApiEndpoint`.
 
 Validate that the response contains the `environment` attribute set to `green` and `version` attribute set to `v2.0.0`
 
 
-### 8. Switch Custom Domain to Green
+### 8. Switch Custom Domain to green
 
-Run the following command to switch the live traffic to the `Green` environment.
+Run the following command to switch the live traffic to the `green` environment.
 
 ```bash
 sam deploy -g -t custom-domain-stack.yaml  --config-file custom-domain-samconfig.toml
@@ -283,13 +283,13 @@ Keep everything else to default values.
 
 Follow the test method mentioned in step #3 to test the Production (live) again. Replace `ApiEndpoint` with `CustomDomainUrl`.
 
-Validate that the response, now, contains the `environment` attribute set to `green` and `version` attribute set to `v2.0.0`. The live traffic is now switched to `Green` environment.
+Validate that the response, now, contains the `environment` attribute set to `green` and `version` attribute set to `v2.0.0`. The live traffic is now switched to `green` environment.
 
-If there was an issue, at this point, you have option to quickly switch the live traffic back to `Blue` environment and fix the green environment.
+If there was an issue, at this point, you have option to quickly switch the live traffic back to `blue` environment and fix the green environment.
 
 Depending on which path you want to choose, follow either step 10A or 10B.
 
-### 10A. Rollback to Blue environment (if needed)
+### 10A. Rollback to blue environment (if needed)
 
 ```bash
 sam deploy -g -t custom-domain-stack.yaml  --config-file custom-domain-samconfig.toml
@@ -307,12 +307,12 @@ Enter the following details:
 
 Keep everything else to default values.
 
-Live traffic is switched to `Blue` environment. You can confirm that by following the step# 3.
+Live traffic is switched to `blue` environment. You can confirm that by following the step# 3.
 
 
-### 10B. Delete Blue Environment (when no longer needed)
+### 10B. Delete blue Environment (when no longer needed)
 
-Run the following command to delete the `Blue` environment when no longer needed. Replace `blue-stack-name` with you blue deployment stack name.
+Run the following command to delete the `blue` environment when no longer needed. Replace `blue-stack-name` with you blue deployment stack name.
 
 ```bash
 sam delete --stack-name <blue-stack-name> --no-prompts
@@ -324,8 +324,6 @@ sam delete --stack-name <blue-stack-name> --no-prompts
 Run the below command to delete the stack when no longer used.
 
 ```bash
-# Navigate to stacks directory
-cd stacks
 
 # Delete all stacks (in reverse order)
 # Delete custom domain
